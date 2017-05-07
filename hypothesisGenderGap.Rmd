@@ -1,0 +1,352 @@
+
+## Statistical inference with the GSS data
+
+
+
+
+---
+
+## Setup
+
+### Load packages
+
+```{r load-packages, message = FALSE}
+library(ggplot2)
+library(dplyr)
+library(gridBase)
+library(gridExtra)
+library(statsr) # For verification only
+```
+
+### Load data
+
+
+
+```{r load-data}
+load("gss.Rdata")
+
+```
+
+
+
+* * *
+
+## Part 1: Data
+The GSS(General Social Survey) is personal interview survey from ramdom US household conducted by National Opinion Research Center (NORC). NORC at University of Chicago is an independant research institution that provide data and analysis in five main areas: Economics, Markets, and the Workforce; Education, Training, and Learning; Global Development; Health and Well-Being; and Society, Media, and Public Affairs.
+
+Data is from randomly sampled subjects from the population of United States. This data is generalizable of US population and can be used only for observational study and not for causal reseaoning.
+
+* * *
+
+## Part 2: Research question
+**Question:** How do proportion of male and female in given GSS sample data compare with respect to attending higher education (Bachelors or above)  ?
+Is there a difference in proportion of male and female with higher education (Bachelors or above) in United States ?
+
+__Background and motivation__
+
+According to Millennium Challenge Corporation (MCC) (https://www.mcc.gov/)
+
+* Gender and social inequality are known constraints to economic growth, and research shows that the benefits from poverty    reduction initiatives are unequally shared with women.
+
+* In some countries, productivity could increase by as much as 25% if the barriers that prevent women from entering the workforce were eliminated 
+
+* Studies find that increases in women’s education boost their wages and gender inequalities in education are associated with negative economic consequences.
+
+While gender inequalities in education in general is more common in North African countries, in advanced economy such as that of United States higher education is important for its citizen to participate in the economy. So our research focus on gender inequalities in __higher education__.
+
+*“We can't allow higher education to be a luxury in this country. It's an economic imperative that
+every family in America has to be able to afford.” - President Barack Obama*
+
+* * *
+
+## Part 3: Exploratory data analysis
+
+Research begins by performing exploratory data analysis on given dataset to determine if there is difference in percentage of Bachelors Degree and Graduate Degree between male and female subjects. 
+
+```{r}
+# Total female subjects
+t_respF <- gss %>% filter(sex=="Female") %>% select(sex)
+t_respF <- nrow(t_respF)
+
+# Creating tables with female having education Bachelors or above
+degree_tblF_cnt <- gss %>% filter(sex=="Female", degree=="Bachelor" | degree=="Graduate") %>% select(degree) %>% group_by(degree) %>% tally()
+
+# Adding a column in above table showing perecentage
+
+degree_tblF_cnt <- degree_tblF_cnt %>% mutate(percent=n*100/ t_respF)
+
+# Total male subjects
+t_respM <- gss %>% filter(sex=="Male") %>% select(sex) 
+t_respM <- nrow(t_respM)
+
+# Creating tables with male having education Bachelors or above
+degree_tblM_cnt <- gss %>% filter(sex=="Male", degree=="Bachelor" | degree=="Graduate") %>% select(degree) %>% group_by(degree) %>% tally()
+# Adding a column in above table showing perecentage
+
+degree_tblM_cnt <- degree_tblM_cnt %>% mutate(percent=n*100/ t_respM)
+
+```
+
+Snaphot of female subjects with education, bachelors or above
+```{r}
+degree_tblF_cnt
+```
+Snaphot of male subjects with education, bachelors or above
+```{r}
+degree_tblM_cnt
+```
+
+Visual comparison of  higher education among female and male in the sample
+
+__Note:__ The sample size of male and female are different so we used percentage for comparison 
+```{r}
+f_hEd <- ggplot(degree_tblF_cnt, aes(x=degree, y=percent)) + geom_bar(stat = "identity", color="black",fill="orange")
+m_hEd <- ggplot(degree_tblM_cnt, aes(x=degree, y=percent)) + geom_bar(stat = "identity", color="black",fill="deepskyblue")
+f_hEd <- f_hEd + scale_y_continuous(limits=c(0, 20)) + ggtitle("Female Higher Education") 
+m_hEd <- m_hEd + scale_y_continuous(limits=c(0, 20)) + ggtitle("Male Higher Education") 
+grid.arrange(f_hEd, m_hEd, ncol=2)
+```
+
+
+__Conclusion:__ Over 2% more male subjects has bachelors degree and around 3% more male has Graduate degree compare to female subjects. 
+
+
+* * *
+
+## Part 4: Inference
+
+In this research, we're going to label sex (male and female) as one of our categorical variables the explanatory variable and level of education (higher and lower), our response variable. So, our categorical variables that have two levels;  success (higher education, Bachelors or above) and  failure (Lower education). We are going to calculate proportion of successes in the two groups based on our sample, and were going to compare this to each other. 
+
+
+```{r}
+# Creating table of sex of respondants and their correponding education degree
+ed_mf <- gss %>% filter(!is.na(sex), !is.na(degree)) %>% select(sex, degree)
+# Classifying degree into level Bachelors and above Higher Education and everything else as Lower
+ed_mf <- ed_mf %>% mutate(lev=ifelse(degree=="Bachelor" | degree=="Graduate", "High", "Low"))
+# Number of samples with High and Low Education for females
+f_level <- ed_mf %>% filter(sex=="Female") %>% group_by(lev) %>% tally()
+# Number of samples with High and Low Education for males
+m_level <- ed_mf %>% filter(sex=="Male") %>% group_by(lev) %>% tally()
+# Total number of subjects by sex
+total <- ed_mf %>% group_by(sex) %>% tally() 
+# Extracting data from above tables for comparision tables 
+f_level_H <- f_level %>% filter(lev=="High") %>% select(n)
+m_level_H <- m_level %>% filter(lev=="High") %>% select(n)
+
+f_tot <- total %>% filter(sex=="Female") %>% select(n)
+m_tot <- total %>% filter(sex=="Male") %>% select(n)
+# Force R not to use exponential notation 
+options(scipen=10000)
+
+
+male <- c(m_level_H$n , m_tot$n - m_level_H$n, m_tot$n, m_level_H$n/m_tot$n )
+female <- c(f_level_H$n , f_tot$n - f_level_H$n, f_tot$n, f_level_H$n/f_tot$n)
+
+#  Creating Comparision table
+comp_table <- data.frame(male, female)
+                    
+# For easy readabilty
+rownames(comp_table) <- c("Higher Education", "No Higher education", "Total (n)", "p_hat")
+
+comp_table
+
+```
+
+__Confidence Interval__
+
+We determine difference between 2 proportion 
+
+$$point\ estimate\ +-\ margin\  of\ error$$
+
+$$(\hat{p}_{male} - \hat{p}_{female})\ +-\ z*SE_{(\hat{p}_{male} - \hat{p}_{female})}$$
+
+We determine standard of error in our research as 
+
+$$ SE = \sqrt{\frac{\hat{p}_{male}*(1-\hat{p}_{male})}{n_{male}} + \frac{\hat{p}_{female}*(1-\hat{p}_{female})}{n_{female}}} $$
+
+__Conditions for inference for comparing two independant proportion__
+
+
+1) Independence:
+
+
+Within groups: Random population and less than 10% of population (US population 319 million approximately).
+
+Between groups:  Education level of one group of explanatory variable is independant of other.
+
+So there is no dependency within or between groups.
+
+2) Sample/skew:
+
+```{r}
+# For males
+m_tot$n*(m_level_H$n/m_tot$n) # Success
+m_tot$n*(1-(m_level_H$n/m_tot$n)) #Failure
+
+# For females
+f_tot$n*(f_level_H$n/f_tot$n) # Success
+f_tot$n*(1-(f_level_H$n/f_tot$n)) #Failure
+```
+
+From above output we can assume that the sampling distribution of the difference
+between two proportions is nearly normal.
+
+__Calculation__
+```{r}
+p_hat_male <- (m_level_H$n/m_tot$n) # Sample proportion of male success (Higher Education)
+p_hat_female <- (f_level_H$n/f_tot$n) # Sample proportion of female success (Higher Education)
+
+# Determining point estimate
+pe <-p_hat_male-p_hat_female
+pe
+
+# Determining Standard error
+se <- sqrt(((p_hat_male*(1-p_hat_male))/m_tot$n)+((p_hat_female*(1-p_hat_female))/f_tot$n))
+se 
+
+# Determining confidence interval
+ci <- c(pe-(1.96*se), pe+(1.96*se))
+ci
+```
+
+__Verification__
+We will verify above calculation using statsr inference() function.
+
+__Note:__
+statsr is not standard R library but a companion package for the Coursera Statistics with R specialization developed by Prof. Dr Mine Cetinkaya-Rundel, Duke University Department of Statistical Science.
+
+```{r}
+inference(y = lev, x=sex, data = ed_mf,  statistic = "proportion", type = "ci",  method = "theoretical", success = "High")
+```
+
+We see that our calculation matches with the ouput of statr inference() function.
+
+__Conclusion:__
+From the above we are 95% confident that proportion of male who has higher education is 4.28% to 5.65% more than proprtion of female with higher education.
+
+
+
+__Hypothesis__
+
+Null Hypothesis: Proportion of male and female in population with higher education  are equal
+
+$$H_0: p_{female}=p_{male}$$
+
+Alternate Hypothesis: Proportion of male and female in population  with higher education are not equal
+
+$$H_A: p_{female}  \neq p_{male}$$
+
+
+We do not have proportion of higher education among male and female population of United States. So we will use __pooled proportion__ .
+
+We define pooled proportion in our research as : 
+
+$$\hat{p}_{pool} = \frac{number\ of\ male\ with\ higher\ education + number\ of\ female\ with\ higher\ education}{ n_{male} + n_{female} }$$
+
+```{r}
+p_hat_pool<-(m_level_H$n+f_level_H$n)/(m_tot$n+f_tot$n)
+p_hat_pool
+```
+
+
+__Conditions for inference for hypothesis test__
+
+1) Independence:
+
+
+Within groups: Random population and less than 10% of population (US population 319 million approximately).
+
+Between groups:  Education level of one group of explanatory variable is independant of other.
+
+So there is no dependency within or between groups.
+
+2) Sample/skew:
+
+```{r}
+# For males
+m_tot$n*p_hat_pool # Success
+m_tot$n*(1-p_hat_pool) #Failure
+
+# For females
+f_tot$n*p_hat_pool # Success
+f_tot$n*(1-p_hat_pool) #Failure
+```
+
+From above output we can assume that the sampling distribution of the difference
+between two proportions is nearly normal.
+
+__Conducting  hypothesis test, __
+__at 5% significance level__   
+
+We will determine Standard Error of Population as
+
+$$ SE = \sqrt{\frac{\hat{p}_{pool}*(1-\hat{p}_{pool})}{n_{male}} + \frac{\hat{p}_{pool}*(1-\hat{p}_{pool})}{n_{female}}} $$
+
+Calculating Standard error
+```{r}
+# Calculating p(1-p)/n1  and p(1-p)/n2
+ml_s <- (p_hat_pool*(1-p_hat_pool))/m_tot$n
+fl_s <- (p_hat_pool*(1-p_hat_pool))/f_tot$n
+# Calculating Standard Error
+se <- sqrt(ml_s + fl_s)
+se
+```
+
+
+Determining point estimate
+```{r}
+prop_diff <- (m_level_H$n/m_tot$n ) -(f_level_H$n/f_tot$n )
+prop_diff
+```
+
+Parameters for calculating z-score and p-value
+$$\alpha=0.05$$
+$$(\hat{p}_{male} - \hat{p}_{female})\ is\ nearly\  N(mean=0, SE=0.003476524)$$
+$$point\ estimate = 0.04966573$$
+
+We will determine z score using
+$$z=\frac{point\ estimate-0}{SE}$$
+
+Determining z score
+```{r}
+z<-(prop_diff-0)/se
+z
+```
+
+$$z\ score=14.28603$$
+
+This is very high test statistics much further than 3 standard deviation from null value.
+So we can safely conclude:
+
+
+$$p\ value\ is\ almost\ 0$$
+
+So we __reject__ null hypothesis in favor of alternate hypothesis.
+
+
+To avoid Type 1 error we will confirm above calculation using __statsr inference()__ function.
+
+
+
+
+__Confirming above calculation using inference {statsr}__
+
+
+__Note:__
+statsr is not standard R library but a companion package for the Coursera Statistics with R specialization developed by Prof. Dr Mine Cetinkaya-Rundel, Duke University Department of Statistical Science.
+
+```{r}
+inference(y = lev, x=sex, data = ed_mf,  statistic = "proportion", type = "ht", alternative="twosided", null=0, method = "theoretical", success = "High")
+
+```
+
+We see z score, p_hat_Male, p_hat_Female from inference() matches with that of our calculation.
+With p_value = < 0.0001   
+we __reject__ null hypothesis in favor of alternate hypothesis.
+
+__Conclusion__:
+Proportion of male and female with higher education in US are not equal. Probability of observed or more extreme outcome given null hypothesis is true is almost 0. In other word probability of difference in population proportion __simply by chance__ is almost 0%.
+
+
+
+
